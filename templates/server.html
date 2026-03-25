@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone2PC - Server Control</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <span class="logo-icon">📱</span>
+                <span class="logo-text">Phone2PC</span>
+            </div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/about">About</a>
+                <a href="https://github.com/telospy/Phone2Pc" target="_blank" class="github-link">
+                    <svg height="18" viewBox="0 0 16 16" width="18">
+                        <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="dashboard">
+        <div class="pc-control-panel">
+            <div class="header-info">
+                <h1>🎮 Server Control Center</h1>
+                <div class="url-box">
+                    <input type="text" id="page-url" value="{{ request.url }}" readonly>
+                    <button class="btn-copy" onclick="copyUrl()">📋 Copy</button>
+                </div>
+            </div>
+
+            <div class="control-panel-grid">
+                <div class="card server-card">
+                    <h2>🚀 Server Configuration</h2>
+                    
+                    <div class="form-group">
+                        <label>🔑 Ngrok Token</label>
+                        <div class="input-with-button">
+                            <input type="password" id="ngrok-token" placeholder="Enter your ngrok token" value="{{ user_data.ngrok_token }}">
+                            <button class="btn-secondary" onclick="window.open('https://dashboard.ngrok.com/signup')">Get Token</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>📁 Save Location</label>
+                        <div class="input-with-button">
+                            <input type="text" id="save-folder" placeholder="Select folder where files will be saved" value="{{ user_data.save_folder }}">
+                            <button class="btn-secondary" onclick="browseFolder()">Browse</button>
+                        </div>
+                        <div id="folder-required" class="folder-required" {% if user_data.save_folder %}style="display: none;"{% endif %}>
+                            ⚠️ <strong>Required:</strong> Select a folder before starting the server
+                        </div>
+                    </div>
+                    
+                    <div class="server-actions">
+                        <button class="btn-start" id="start-btn" {% if not user_data.save_folder %}disabled{% endif %}>
+                            <span>🚀</span> Start Server
+                        </button>
+                        <button class="btn-stop" id="stop-btn" disabled>
+                            <span>🛑</span> Stop Server
+                        </button>
+                    </div>
+                    
+                    <div id="server-status" class="status-display">
+                        <div class="status-offline">
+                            <span class="status-dot"></span>
+                            <span>Server is offline</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="qr-card" class="card qr-card" style="display: none;">
+                    <h2>📱 Share with Client</h2>
+                    <div class="qr-container">
+                        <div id="qr-code"></div>
+                        <div class="share-url-box">
+                            <input type="text" id="share-url" readonly>
+                            <button class="btn-copy" onclick="copyShareUrl()">📋 Copy URL</button>
+                        </div>
+                        <p class="qr-hint">Scan QR code or share this link with your phone/tablet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="transfer-section">
+            <div class="card upload-card">
+                <h2>📤 Upload Files</h2>
+                
+                <div class="upload-tabs">
+                    <button class="tab-btn active" data-tab="files">📁 Files</button>
+                    <button class="tab-btn" data-tab="folder">📂 Folder</button>
+                    <button class="tab-btn" data-tab="message">💬 Message</button>
+                </div>
+                
+                <div class="tab-content active" id="files-tab">
+                    <input type="file" id="file-input" multiple class="file-input">
+                    <button class="btn-upload" onclick="uploadFiles()">Upload Files</button>
+                    <div id="upload-progress" class="progress-bar" style="display: none;">
+                        <div class="progress-fill"></div>
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="folder-tab">
+                    <input type="file" id="folder-input" webkitdirectory directory multiple class="file-input">
+                    <button class="btn-upload" onclick="uploadFolder()">Upload Folder</button>
+                </div>
+                
+                <div class="tab-content" id="message-tab">
+                    <textarea id="message-input" rows="3" placeholder="Type your message here..."></textarea>
+                    <button class="btn-upload" onclick="sendMessage()">Send Message</button>
+                </div>
+            </div>
+
+            <div class="card files-card">
+                <h2>📥 Files</h2>
+                <div id="file-list" class="file-list">
+                    <div class="empty-state">
+                        <span>📭</span>
+                        <p>No files yet</p>
+                    </div>
+                </div>
+                <button class="btn-clear" onclick="clearAll()">🗑️ Clear All</button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p>Made with ❤️ by <a href="https://github.com/telospy" target="_blank">Tsegaye (131)</a></p>
+            <p class="footer-links">
+                <a href="https://github.com/telospy/Phone2Pc" target="_blank">GitHub</a>
+                <span>•</span>
+                <a href="/about">About</a>
+            </p>
+        </div>
+    </footer>
+
+    <div id="preview-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <div id="preview-container"></div>
+        </div>
+    </div>
+
+    <script>
+        // Variables from server
+        var userId = "{{ user_id }}";
+        var savedToken = "{{ user_data.ngrok_token }}";
+        var savedFolder = "{{ user_data.save_folder }}";
+        var clientUrl = "{{ request.host_url.rstrip('/') }}/client/{{ user_data.secret_key }}";
+        
+        var serverRunning = false;
+        var refreshInterval = null;
+        var statusInterval = null;
+        
+        var startBtn = document.getElementById('start-btn');
+        var stopBtn = document.getElementById('stop-btn');
+        var ngrokTokenInput = document.getElementById('ngrok-token');
+        var saveFolderInput = document.getElementById('save-folder');
+        var folderRequired = document.getElementById('folder-required');
+        
+        function showToast(message, type) {
+            var toast = document.createElement('div');
+            toast.className = 'toast toast-' + (type || 'info');
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(function() { toast.remove(); }, 3000);
+        }
+        
+        function copyUrl() {
+            var urlInput = document.getElementById('page-url');
+            if (urlInput) {
+                urlInput.select();
+                document.execCommand('copy');
+                showToast('✅ Link copied!', 'success');
+            }
+        }
+        
+        function copyShareUrl() {
+            var urlInput = document.getElementById('share-url');
+            if (urlInput) {
+                urlInput.select();
+                document.execCommand('copy');
+                showToast('✅ Client link copied!', 'success');
+            }
+        }
+        
+        function browseFolder() {
+            var input = document.createElement('input');
+            input.type = 'file';
+            input.webkitdirectory = true;
+            input.onchange = function(e) {
+                if (e.target.files.length > 0) {
+                    var path = e.target.files[0].webkitRelativePath;
+                    var folderPath = path.split('/')[0];
+                    if (saveFolderInput) {
+                        saveFolderInput.value = folderPath;
+                        validateStartButton();
+                        saveSettings();
+                    }
+                }
+            };
+            input.click();
+        }
+        
+        function validateStartButton() {
+            if (!startBtn) return;
+            var folder = saveFolderInput ? saveFolderInput.value : '';
+            if (!folder) {
+                startBtn.disabled = true;
+                if (folderRequired) folderRequired.style.display = 'block';
+            } else {
+                startBtn.disabled = false;
+                if (folderRequired) folderRequired.style.display = 'none';
+            }
+        }
+        
+        async function saveSettings() {
+            var token = ngrokTokenInput ? ngrokTokenInput.value : '';
+            var folder = saveFolderInput ? saveFolderInput.value : '';
+            if (!token && !folder) return;
+            try {
+                await fetch('/api/' + userId + '/save_settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ngrok_token: token, save_folder: folder })
+                });
+            } catch (error) {
+                console.error('Save settings error:', error);
+            }
+        }
+        
+        async function checkServerStatus() {
+            try {
+                var response = await fetch('/api/' + userId + '/status');
+                var data = await response.json();
+                
+                if (data.running) {
+                    serverRunning = true;
+                    if (startBtn) {
+                        startBtn.innerHTML = '✅ Running';
+                        startBtn.disabled = true;
+                        startBtn.style.background = '#27ae60';
+                    }
+                    if (stopBtn) stopBtn.disabled = false;
+                    
+                    updateStatus('online', data.url);
+                    await showQRCode(clientUrl);
+                    startStatusCheck();
+                    loadFiles();
+                }
+            } catch (error) {
+                console.error('Status check error:', error);
+            }
+        }
+        
+        function updateStatus(status, publicUrl) {
+            var statusDiv = document.getElementById('server-status');
+            if (!statusDiv) return;
+            
+            if (status === 'online') {
+                statusDiv.innerHTML = '<div class="status-online"><div class="status-dot"></div><span>✅ Server is running</span></div><div style="font-size: 0.75rem; margin-top: 6px; word-break: break-all;">🔗 ' + publicUrl + '</div><div id="timer" class="timer"></div>';
+            } else {
+                statusDiv.innerHTML = '<div class="status-offline"><div class="status-dot"></div><span>Server is offline</span></div>';
+            }
+        }
+        
+        async function showQRCode(url) {
+            try {
+                var response = await fetch('/api/' + userId + '/qr?url=' + encodeURIComponent(url));
+                var data = await response.json();
+                
+                if (data.qr_code) {
+                    var qrCard = document.getElementById('qr-card');
+                    var qrDiv = document.getElementById('qr-code');
+                    var shareUrlInput = document.getElementById('share-url');
+                    
+                    if (qrDiv) {
+                        qrDiv.innerHTML = '<img src="data:image/png;base64,' + data.qr_code + '" alt="QR Code">';
+                        if (qrCard) qrCard.style.display = 'block';
+                    }
+                    
+                    if (shareUrlInput) {
+                        shareUrlInput.value = url;
+                    }
+                }
+            } catch (error) {
+                console.error('QR error:', error);
+            }
+        }
+        
+        function startStatusCheck() {
+            if (statusInterval) clearInterval(statusInterval);
+            
+            statusInterval = setInterval(async function() {
+                if (!serverRunning) return;
+                
+                try {
+                    var response = await fetch('/api/' + userId + '/status');
+                    var data = await response.json();
+                    
+                    if (data.running) {
+                        var mins = Math.floor(data.remaining_seconds / 60);
+                        var secs = data.remaining_seconds % 60;
+                        var timerDiv = document.getElementById('timer');
+                        if (timerDiv) {
+                            timerDiv.innerHTML = '⏰ Expires in: ' + mins.toString().padStart(2, '0') + ':' + secs.toString().padStart(2, '0');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Status check error:', error);
+                }
+            }, 1000);
+        }
+        
+        async function startServer() {
+            var token = ngrokTokenInput ? ngrokTokenInput.value : '';
+            var folder = saveFolderInput ? saveFolderInput.value : '';
+            
+            if (!token) {
+                showToast('Please enter your ngrok token', 'error');
+                return;
+            }
+            if (!folder) {
+                showToast('Please select a save folder', 'error');
+                return;
+            }
+            
+            await saveSettings();
+            
+            if (startBtn) {
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<span class="loader"></span> Starting...';
+            }
+            
+            try {
+                var response = await fetch('/api/' + userId + '/start_server', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ngrok_token: token, save_folder: folder })
+                });
+                
+                var data = await response.json();
+                
+                if (data.success) {
+                    serverRunning = true;
+                    if (startBtn) {
+                        startBtn.innerHTML = '✅ Running';
+                        startBtn.style.background = '#27ae60';
+                    }
+                    if (stopBtn) stopBtn.disabled = false;
+                    
+                    updateStatus('online', data.url);
+                    await showQRCode(data.client_url);
+                    startStatusCheck();
+                    loadFiles();
+                    
+                    showToast('✅ Server started successfully!', 'success');
+                } else {
+                    showToast(data.error || 'Failed to start server', 'error');
+                    if (startBtn) {
+                        startBtn.disabled = false;
+                        startBtn.innerHTML = '🚀 Start Server';
+                        startBtn.style.background = '';
+                    }
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+                if (startBtn) {
+                    startBtn.disabled = false;
+                    startBtn.innerHTML = '🚀 Start Server';
+                    startBtn.style.background = '';
+                }
+            }
+        }
+        
+        async function stopServer() {
+            try {
+                var response = await fetch('/api/' + userId + '/stop_server', { method: 'POST' });
+                var data = await response.json();
+                
+                if (data.success) {
+                    serverRunning = false;
+                    if (startBtn) {
+                        startBtn.disabled = false;
+                        startBtn.innerHTML = '🚀 Start Server';
+                        startBtn.style.background = '';
+                    }
+                    if (stopBtn) stopBtn.disabled = true;
+                    
+                    var qrCard = document.getElementById('qr-card');
+                    if (qrCard) qrCard.style.display = 'none';
+                    
+                    updateStatus('offline');
+                    
+                    if (refreshInterval) clearInterval(refreshInterval);
+                    if (statusInterval) clearInterval(statusInterval);
+                    
+                    showToast('🛑 Server stopped', 'success');
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function uploadFiles() {
+            var files = document.getElementById('file-input').files;
+            if (!files || files.length === 0) {
+                showToast('Select files to upload', 'error');
+                return;
+            }
+            
+            var formData = new FormData();
+            for (var i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+            
+            var progressDiv = document.getElementById('upload-progress');
+            var progressFill = document.getElementById('progress-fill');
+            if (progressDiv) progressDiv.style.display = 'block';
+            
+            try {
+                var response = await fetch('/api/' + userId + '/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                var data = await response.json();
+                
+                if (data.success) {
+                    showToast('✅ Uploaded ' + data.count + ' files!', 'success');
+                    document.getElementById('file-input').value = '';
+                    loadFiles();
+                } else {
+                    showToast('Upload failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            } finally {
+                if (progressDiv) progressDiv.style.display = 'none';
+                if (progressFill) progressFill.style.width = '0%';
+            }
+        }
+        
+        async function uploadFolder() {
+            var files = document.getElementById('folder-input').files;
+            if (!files || files.length === 0) {
+                showToast('Select a folder', 'error');
+                return;
+            }
+            
+            var formData = new FormData();
+            formData.append('type', 'folder');
+            for (var i = 0; i < files.length; i++) {
+                formData.append('folder_files', files[i]);
+            }
+            
+            try {
+                var response = await fetch('/api/' + userId + '/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                var data = await response.json();
+                
+                if (data.success) {
+                    showToast('✅ Folder uploaded!', 'success');
+                    document.getElementById('folder-input').value = '';
+                    loadFiles();
+                } else {
+                    showToast('Upload failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function sendMessage() {
+            var message = document.getElementById('message-input').value;
+            if (!message || !message.trim()) {
+                showToast('Enter a message', 'error');
+                return;
+            }
+            
+            var formData = new FormData();
+            formData.append('type', 'message');
+            formData.append('message', message);
+            
+            try {
+                var response = await fetch('/api/' + userId + '/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                var data = await response.json();
+                
+                if (data.success) {
+                    showToast('✅ Message saved!', 'success');
+                    document.getElementById('message-input').value = '';
+                    loadFiles();
+                } else {
+                    showToast('Failed to save message', 'error');
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function loadFiles() {
+            try {
+                var response = await fetch('/api/' + userId + '/files');
+                var data = await response.json();
+                
+                var fileList = document.getElementById('file-list');
+                if (!fileList) return;
+                
+                if (!data.categories || data.categories.length === 0) {
+                    fileList.innerHTML = '<div class="empty-state"><span>📭</span><p>No files yet</p></div>';
+                    return;
+                }
+                
+                var html = '';
+                for (var i = 0; i < data.categories.length; i++) {
+                    var category = data.categories[i];
+                    html += '<h3 style="margin: 0.8rem 0 0.4rem 0; font-size: 0.9rem;">' + category.name + '</h3>';
+                    for (var j = 0; j < category.files.length; j++) {
+                        var file = category.files[j];
+                        html += '<div class="file-item"><div class="file-header"><span class="file-name">📄 ' + escapeHtml(file.name) + '</span><span class="file-size">' + file.size + ' MB</span></div><div class="file-actions">';
+                        if (file.can_preview) html += '<button onclick="previewFile(\'' + file.path + '\')">👁️ View</button>';
+                        html += '<button onclick="downloadFile(\'' + file.path + '\')">⬇️ Download</button><button onclick="deleteFile(\'' + file.path + '\')">🗑️ Delete</button></div></div>';
+                    }
+                }
+                
+                fileList.innerHTML = html;
+            } catch (error) {
+                console.error('Load files error:', error);
+            }
+        }
+        
+        async function previewFile(filePath) {
+            var modal = document.getElementById('preview-modal');
+            var container = document.getElementById('preview-container');
+            
+            if (!modal || !container) return;
+            
+            container.innerHTML = '<div style="text-align: center; padding: 40px;">Loading...</div>';
+            modal.style.display = 'flex';
+            
+            var ext = filePath.split('.').pop().toLowerCase();
+            
+            if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) {
+                container.innerHTML = '<img src="/api/' + userId + '/preview?file=' + encodeURIComponent(filePath) + '" style="max-width: 100%; height: auto;">';
+            } else if (ext === 'pdf') {
+                container.innerHTML = '<iframe src="/api/' + userId + '/preview?file=' + encodeURIComponent(filePath) + '" style="width: 100%; height: 70vh; border: none;"></iframe>';
+            } else if (ext === 'txt') {
+                var response = await fetch('/api/' + userId + '/preview?file=' + encodeURIComponent(filePath));
+                var text = await response.text();
+                container.innerHTML = '<pre style="padding: 15px; white-space: pre-wrap; font-family: monospace; font-size: 0.8rem;">' + escapeHtml(text) + '</pre>';
+            } else {
+                container.innerHTML = '<div style="text-align: center; padding: 40px;">Preview not available</div>';
+            }
+        }
+        
+        function downloadFile(filePath) {
+            window.location.href = '/api/' + userId + '/download?file=' + encodeURIComponent(filePath);
+        }
+        
+        async function deleteFile(filePath) {
+            try {
+                var response = await fetch('/api/' + userId + '/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file: filePath })
+                });
+                
+                var data = await response.json();
+                if (data.success) {
+                    showToast('✅ File deleted', 'success');
+                    loadFiles();
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function clearAll() {
+            if (!confirm('⚠️ Delete ALL files?')) return;
+            
+            try {
+                var response = await fetch('/api/' + userId + '/clear', { method: 'POST' });
+                var data = await response.json();
+                if (data.success) {
+                    showToast('✅ All files cleared', 'success');
+                    loadFiles();
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        }
+        
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        var tabBtns = document.querySelectorAll('.tab-btn');
+        for (var i = 0; i < tabBtns.length; i++) {
+            tabBtns[i].addEventListener('click', function() {
+                var tab = this.dataset.tab;
+                var btns = document.querySelectorAll('.tab-btn');
+                for (var j = 0; j < btns.length; j++) {
+                    btns[j].classList.remove('active');
+                }
+                var contents = document.querySelectorAll('.tab-content');
+                for (var k = 0; k < contents.length; k++) {
+                    contents[k].classList.remove('active');
+                }
+                this.classList.add('active');
+                document.getElementById(tab + '-tab').classList.add('active');
+            });
+        }
+        
+        function setupDragAndDrop() {
+            var uploadCard = document.querySelector('.upload-card');
+            if (!uploadCard) return;
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(eventName) {
+                uploadCard.addEventListener(eventName, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+            });
+            
+            ['dragenter', 'dragover'].forEach(function(eventName) {
+                uploadCard.addEventListener(eventName, function() {
+                    uploadCard.classList.add('drag-over');
+                });
+            });
+            
+            ['dragleave', 'drop'].forEach(function(eventName) {
+                uploadCard.addEventListener(eventName, function() {
+                    uploadCard.classList.remove('drag-over');
+                });
+            });
+            
+            uploadCard.addEventListener('drop', async function(e) {
+                var files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    var items = e.dataTransfer.items;
+                    var hasFolder = false;
+                    
+                    for (var i = 0; i < items.length; i++) {
+                        var entry = items[i].webkitGetAsEntry();
+                        if (entry && entry.isDirectory) {
+                            hasFolder = true;
+                            break;
+                        }
+                    }
+                    
+                    if (hasFolder) {
+                        var allFiles = [];
+                        for (var j = 0; j < items.length; j++) {
+                            var entry = items[j].webkitGetAsEntry();
+                            if (entry) {
+                                await traverseDirectory(entry, '', allFiles);
+                            }
+                        }
+                        
+                        var formData = new FormData();
+                        formData.append('type', 'folder');
+                        for (var k = 0; k < allFiles.length; k++) {
+                            formData.append('folder_files', allFiles[k]);
+                        }
+                        
+                        var response = await fetch('/api/' + userId + '/upload', { method: 'POST', body: formData });
+                        var data = await response.json();
+                        if (data.success) {
+                            showToast('✅ Folder uploaded!', 'success');
+                            loadFiles();
+                        }
+                    } else {
+                        var formData = new FormData();
+                        for (var m = 0; m < files.length; m++) {
+                            formData.append('files', files[m]);
+                        }
+                        
+                        var response = await fetch('/api/' + userId + '/upload', { method: 'POST', body: formData });
+                        var data = await response.json();
+                        if (data.success) {
+                            showToast('✅ Uploaded ' + data.count + ' files!', 'success');
+                            loadFiles();
+                        }
+                    }
+                }
+            });
+        }
+        
+        async function traverseDirectory(entry, path, files) {
+            if (entry.isFile) {
+                return new Promise(function(resolve) {
+                    entry.file(function(file) {
+                        Object.defineProperty(file, 'webkitRelativePath', { value: path + file.name });
+                        files.push(file);
+                        resolve();
+                    });
+                });
+            } else if (entry.isDirectory) {
+                var reader = entry.createReader();
+                return new Promise(function(resolve) {
+                    reader.readEntries(async function(entries) {
+                        for (var i = 0; i < entries.length; i++) {
+                            await traverseDirectory(entries[i], path + entry.name + '/', files);
+                        }
+                        resolve();
+                    });
+                });
+            }
+        }
+        
+        // Attach event listeners
+        if (startBtn) {
+            startBtn.onclick = startServer;
+        }
+        if (stopBtn) {
+            stopBtn.onclick = stopServer;
+        }
+        if (ngrokTokenInput) {
+            ngrokTokenInput.addEventListener('input', function() {
+                saveSettings();
+                validateStartButton();
+            });
+        }
+        if (saveFolderInput) {
+            saveFolderInput.addEventListener('input', function() {
+                saveSettings();
+                validateStartButton();
+            });
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async function() {
+            if (savedToken && ngrokTokenInput) ngrokTokenInput.value = savedToken;
+            if (savedFolder && saveFolderInput) saveFolderInput.value = savedFolder;
+            
+            validateStartButton();
+            
+            await checkServerStatus();
+            setupDragAndDrop();
+            loadFiles();
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(loadFiles, 3000);
+        });
+        
+        // Modal close
+        var modalClose = document.querySelector('.modal-close');
+        if (modalClose) {
+            modalClose.addEventListener('click', function() {
+                var modal = document.getElementById('preview-modal');
+                if (modal) modal.style.display = 'none';
+            });
+        }
+        
+        var previewModal = document.getElementById('preview-modal');
+        if (previewModal) {
+            previewModal.addEventListener('click', function(e) {
+                if (e.target === e.currentTarget) {
+                    e.currentTarget.style.display = 'none';
+                }
+            });
+        }
+        
+        // Expose functions to global scope
+        window.copyUrl = copyUrl;
+        window.copyShareUrl = copyShareUrl;
+        window.browseFolder = browseFolder;
+        window.uploadFiles = uploadFiles;
+        window.uploadFolder = uploadFolder;
+        window.sendMessage = sendMessage;
+        window.previewFile = previewFile;
+        window.downloadFile = downloadFile;
+        window.deleteFile = deleteFile;
+        window.clearAll = clearAll;
+    </script>
+</body>
+</html>

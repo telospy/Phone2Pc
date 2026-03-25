@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About - Phone2PC</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <span class="logo-icon">📱</span>
+                <span class="logo-text">Phone2PC</span>
+            </div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/about" class="active">About</a>
+                <a href="https://github.com/telospy/Phone2Pc" target="_blank" class="github-link">
+                    <svg height="20" viewBox="0 0 16 16" width="20" style="margin-right: 5px;">
+                        <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="about-page">
+        <div class="about-hero">
+            <h1>About Phone2PC</h1>
+            <p>Instant file transfer between any devices</p>
+        </div>
+
+        <div class="about-content">
+            <div class="card about-card">
+                <h2>📱 What is Phone2PC?</h2>
+                <p>Phone2PC is a free, open-source file transfer tool that lets you share files between any devices - Phone to PC, PC to Phone, and PC to PC - instantly with a QR code.</p>
+            </div>
+
+            <div class="card about-card">
+                <h2>⚡ How It Works</h2>
+                <div class="steps">
+                    <div class="step"><div class="step-number">1</div><div class="step-content"><h3>Create Your Space</h3><p>Get your unique random link</p></div></div>
+                    <div class="step"><div class="step-number">2</div><div class="step-content"><h3>Start Server on PC</h3><p>Enter your ngrok token and select where files are saved</p></div></div>
+                    <div class="step"><div class="step-number">3</div><div class="step-content"><h3>Scan QR Code with Phone</h3><p>Your phone connects instantly to your PC</p></div></div>
+                    <div class="step"><div class="step-number">4</div><div class="step-content"><h3>Transfer Files!</h3><p>Upload from phone to PC, download from PC to phone</p></div></div>
+                </div>
+            </div>
+
+            <div class="card about-card">
+                <h2>🔄 Transfer Modes</h2>
+                <div class="modes-grid">
+                    <div class="mode"><div class="mode-icon">📱➡️💻</div><h3>Phone to PC</h3><p>Upload photos, videos, documents from your phone directly to your computer</p></div>
+                    <div class="mode"><div class="mode-icon">💻➡️📱</div><h3>PC to Phone</h3><p>Download files from your PC to your phone with one tap</p></div>
+                    <div class="mode"><div class="mode-icon">💻➡️💻</div><h3>PC to PC</h3><p>Share files between computers without USB drives or cables</p></div>
+                </div>
+            </div>
+
+            <div class="card about-card">
+                <h2>🔒 Security & Privacy</h2>
+                <ul class="security-list">
+                    <li>✅ End-to-end encrypted transfers via ngrok</li>
+                    <li>✅ Links expire after 2 hours automatically</li>
+                    <li>✅ Files stay on your PC - never stored on our servers</li>
+                    <li>✅ Secret links prevent unauthorized access</li>
+                    <li>✅ 100% open source - inspect the code yourself</li>
+                    <li>📦 <strong>500MB per file limit</strong> (ngrok free tier limitation)</li>
+                    <li>⏱️ <strong>2-hour session limit</strong> (ngrok free tier limitation)</li>
+                </ul>
+                <div class="limitation-notice">
+                    <p>⚠️ <strong>Ngrok Free Tier Limitations:</strong></p>
+                    <ul><li>• 500MB maximum file size per transfer</li><li>• 2-hour session time limit</li><li>• 40 connections per minute</li></ul>
+                    <p class="upgrade-message">💡 <strong>Want to remove these limitations?</strong> Subscribe to ngrok's paid plans for:</p>
+                    <ul><li>• Unlimited file size</li><li>• Custom domains</li><li>• Higher connection limits</li><li>• Reserved URLs</li></ul>
+                    <a href="https://ngrok.com/pricing" target="_blank" class="btn-ngrok">Learn More About ngrok Plans →</a>
+                </div>
+            </div>
+
+            <div class="card about-card">
+                <h2>💻 Tech Stack</h2>
+                <div class="tech-stack"><span class="tech-badge">Python Flask</span><span class="tech-badge">ngrok</span><span class="tech-badge">QR Code</span><span class="tech-badge">WebSocket</span><span class="tech-badge">HTML5/CSS3</span><span class="tech-badge">JavaScript</span></div>
+            </div>
+
+            <div class="card about-card">
+                <h2>📝 License</h2>
+                <p>Phone2PC is open source software licensed under the MIT License. Feel free to use, modify, and distribute!</p>
+                <div class="github-star"><a href="https://github.com/telospy/Phone2Pc" target="_blank" class="btn-github">⭐ Star on GitHub</a></div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p>Made with ❤️ by <a href="https://github.com/telospy" target="_blank">Tsegaye (131)</a></p>
+            <p class="footer-links"><a href="https://github.com/telospy/Phone2Pc" target="_blank">GitHub</a><span>•</span><a href="/">Home</a></p>
+        </div>
+    </footer>
+</body>
+</html>

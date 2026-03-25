@@ -1,0 +1,15 @@
+# render.yaml
+services:
+  - type: web
+    name: phone2pc
+    runtime: python
+    repo: https://github.com/telospy/Phone2Pc
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn wsgi:app
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.9.0

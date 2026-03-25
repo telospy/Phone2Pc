@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Phone2PC - Transfer Files</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <span class="logo-icon">📱</span>
+                <span class="logo-text">Phone2PC</span>
+            </div>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/about">About</a>
+                <a href="https://github.com/telospy/Phone2Pc" target="_blank" class="github-link">
+                    <svg height="18" viewBox="0 0 16 16" width="18">
+                        <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                    GitHub
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="dashboard">
+        <div class="client-interface">
+            <div class="connection-status-card">
+                <div class="connection-status">
+                    <div class="pulse-dot"></div>
+                    <span id="client-status-text">✅ Connected to Server</span>
+                </div>
+                <div class="folder-path">
+                    📁 Files are saved on server at: <strong>{{ user_data.save_folder }}</strong>
+                </div>
+            </div>
+        </div>
+
+        <div class="transfer-section">
+            <div class="card upload-card">
+                <h2>📤 Upload Files</h2>
+                
+                <div class="upload-tabs">
+                    <button class="tab-btn active" data-tab="files">📁 Files</button>
+                    <button class="tab-btn" data-tab="folder">📂 Folder</button>
+                    <button class="tab-btn" data-tab="message">💬 Message</button>
+                </div>
+                
+                <div class="tab-content active" id="files-tab">
+                    <input type="file" id="file-input" multiple class="file-input">
+                    <button class="btn-upload" onclick="uploadFiles()">Upload Files</button>
+                    <div id="upload-progress" class="progress-bar" style="display: none;">
+                        <div class="progress-fill"></div>
+                    </div>
+                </div>
+                
+                <div class="tab-content" id="folder-tab">
+                    <input type="file" id="folder-input" webkitdirectory directory multiple class="file-input">
+                    <button class="btn-upload" onclick="uploadFolder()">Upload Folder</button>
+                </div>
+                
+                <div class="tab-content" id="message-tab">
+                    <textarea id="message-input" rows="3" placeholder="Type your message here..."></textarea>
+                    <button class="btn-upload" onclick="sendMessage()">Send Message</button>
+                </div>
+            </div>
+
+            <div class="card files-card">
+                <h2>📥 Files</h2>
+                <div id="file-list" class="file-list">
+                    <div class="empty-state">
+                        <span>📭</span>
+                        <p>No files yet</p>
+                    </div>
+                </div>
+                <button class="btn-clear" onclick="clearAll()">🗑️ Clear All</button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p>Made with ❤️ by <a href="https://github.com/telospy" target="_blank">Tsegaye (131)</a></p>
+        </div>
+    </footer>
+
+    <div id="preview-modal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <div id="preview-container"></div>
+        </div>
+    </div>
+
+    <script>
+        var userId = "{{ user_id }}";
+        var savedToken = "{{ user_data.ngrok_token }}";
+        var savedFolder = "{{ user_data.save_folder }}";
+        
+        var refreshInterval = null;
+        
+        function showToast(message, type) {
+            var toast = document.createElement('div');
+            toast.className = 'toast toast-' + (type || 'info');
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(function() { toast.remove(); }, 3000);
+        }
+        
+        async function uploadFiles() {
+            var files = document.getElementById('file-input').files;
+            if (!files || files.length === 0) {
+                showToast('Select files to upload', 'error');
+                return;
+            }
+            
+            var formData = new FormData();
+            for (var i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+            
+            var progressDiv = document.getElementById('upload-progress');
+            var progressFill = document.getElementById('progress-fill');
+            if (progressDiv) progressDiv.style.display = 'block';
+            
+            try {
+                var response = await fetch('/api/' + userId + '/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                var data = await response.json();
+                
+                if (data.success) {
+                    showToast('✅ Uploaded ' + data.count + ' files!', 'success');
+                    document.getElementById('file-input').value = '';
+                    loadFiles();
+                } else {
+                    showToast('Upload failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            } finally {
+                if (progressDiv) progressDiv.style.display = 'none';
+                if (progressFill) progressFill.style.width = '0%';
+            }
+        }
+        
+        async function uploadFolder() {
+            var files = document.getElementById('folder-input').files;
+            if (!files || files.length === 0) {
+                showToast('Select a folder', 'error');
+                return;
+            }
+            
+            var formData = new FormData();
+            formData.append('type', 'folder');
+            for (var i = 0; i < files.length; i++) {
+                formData.append('folder_files', files[i]);
+            }
+            
+            try {
+                var response = await fetch('/api/' + userId + '/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                var data = await response.json();
+                
+                if (data.success) {
+                    showToast('✅ Folder uploaded!', 'success');
+                    document.getElementById('folder-input').value = '';
+                    loadFiles();
+                } else {
+                    showToast('Upload failed', 'error');
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function sendMessage() {
+            var message = document.getElementById('message-input').value;
+            if (!message || !message.trim()) {
+                showToast('Enter a message', 'error');
+                return;
+            }
+            
+            var formData = new FormData();
+            formData.append('type', 'message');
+            formData.append('message', message);
+            
+            try {
+                var response = await fetch('/api/' + userId + '/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                var data = await response.json();
+                
+                if (data.success) {
+                    showToast('✅ Message saved!', 'success');
+                    document.getElementById('message-input').value = '';
+                    loadFiles();
+                } else {
+                    showToast('Failed to save message', 'error');
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function loadFiles() {
+            try {
+                var response = await fetch('/api/' + userId + '/files');
+                var data = await response.json();
+                
+                var fileList = document.getElementById('file-list');
+                if (!fileList) return;
+                
+                if (!data.categories || data.categories.length === 0) {
+                    fileList.innerHTML = '<div class="empty-state"><span>📭</span><p>No files yet</p></div>';
+                    return;
+                }
+                
+                var html = '';
+                for (var i = 0; i < data.categories.length; i++) {
+                    var category = data.categories[i];
+                    html += '<h3 style="margin: 0.8rem 0 0.4rem 0; font-size: 0.9rem;">' + category.name + '</h3>';
+                    for (var j = 0; j < category.files.length; j++) {
+                        var file = category.files[j];
+                        html += '<div class="file-item"><div class="file-header"><span class="file-name">📄 ' + escapeHtml(file.name) + '</span><span class="file-size">' + file.size + ' MB</span></div><div class="file-actions">';
+                        if (file.can_preview) html += '<button onclick="previewFile(\'' + file.path + '\')">👁️ View</button>';
+                        html += '<button onclick="downloadFile(\'' + file.path + '\')">⬇️ Download</button><button onclick="deleteFile(\'' + file.path + '\')">🗑️ Delete</button></div></div>';
+                    }
+                }
+                
+                fileList.innerHTML = html;
+            } catch (error) {
+                console.error('Load files error:', error);
+            }
+        }
+        
+        async function previewFile(filePath) {
+            var modal = document.getElementById('preview-modal');
+            var container = document.getElementById('preview-container');
+            
+            if (!modal || !container) return;
+            
+            container.innerHTML = '<div style="text-align: center; padding: 40px;">Loading...</div>';
+            modal.style.display = 'flex';
+            
+            var ext = filePath.split('.').pop().toLowerCase();
+            
+            if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(ext)) {
+                container.innerHTML = '<img src="/api/' + userId + '/preview?file=' + encodeURIComponent(filePath) + '" style="max-width: 100%; height: auto;">';
+            } else if (ext === 'pdf') {
+                container.innerHTML = '<iframe src="/api/' + userId + '/preview?file=' + encodeURIComponent(filePath) + '" style="width: 100%; height: 70vh; border: none;"></iframe>';
+            } else if (ext === 'txt') {
+                var response = await fetch('/api/' + userId + '/preview?file=' + encodeURIComponent(filePath));
+                var text = await response.text();
+                container.innerHTML = '<pre style="padding: 15px; white-space: pre-wrap; font-family: monospace; font-size: 0.8rem;">' + escapeHtml(text) + '</pre>';
+            } else {
+                container.innerHTML = '<div style="text-align: center; padding: 40px;">Preview not available</div>';
+            }
+        }
+        
+        function downloadFile(filePath) {
+            window.location.href = '/api/' + userId + '/download?file=' + encodeURIComponent(filePath);
+        }
+        
+        async function deleteFile(filePath) {
+            try {
+                var response = await fetch('/api/' + userId + '/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ file: filePath })
+                });
+                
+                var data = await response.json();
+                if (data.success) {
+                    showToast('✅ File deleted', 'success');
+                    loadFiles();
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        }
+        
+        async function clearAll() {
+            if (!confirm('⚠️ Delete ALL files?')) return;
+            
+            try {
+                var response = await fetch('/api/' + userId + '/clear', { method: 'POST' });
+                var data = await response.json();
+                if (data.success) {
+                    showToast('✅ All files cleared', 'success');
+                    loadFiles();
+                }
+            } catch (error) {
+                showToast('Error: ' + error.message, 'error');
+            }
+        }
+        
+        function escapeHtml(text) {
+            var div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        var tabBtns = document.querySelectorAll('.tab-btn');
+        for (var i = 0; i < tabBtns.length; i++) {
+            tabBtns[i].addEventListener('click', function() {
+                var tab = this.dataset.tab;
+                var btns = document.querySelectorAll('.tab-btn');
+                for (var j = 0; j < btns.length; j++) {
+                    btns[j].classList.remove('active');
+                }
+                var contents = document.querySelectorAll('.tab-content');
+                for (var k = 0; k < contents.length; k++) {
+                    contents[k].classList.remove('active');
+                }
+                this.classList.add('active');
+                document.getElementById(tab + '-tab').classList.add('active');
+            });
+        }
+        
+        async function checkConnection() {
+            try {
+                var response = await fetch('/api/' + userId + '/status');
+                var data = await response.json();
+                var statusText = document.getElementById('client-status-text');
+                if (statusText) {
+                    if (data.running) {
+                        statusText.innerHTML = '✅ Connected to Server';
+                    } else {
+                        statusText.innerHTML = '⏳ Waiting for Server...';
+                    }
+                }
+            } catch (error) {
+                console.error('Connection check error:', error);
+            }
+        }
+        
+        function setupDragAndDrop() {
+            var uploadCard = document.querySelector('.upload-card');
+            if (!uploadCard) return;
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function(eventName) {
+                uploadCard.addEventListener(eventName, function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+            });
+            
+            ['dragenter', 'dragover'].forEach(function(eventName) {
+                uploadCard.addEventListener(eventName, function() {
+                    uploadCard.classList.add('drag-over');
+                });
+            });
+            
+            ['dragleave', 'drop'].forEach(function(eventName) {
+                uploadCard.addEventListener(eventName, function() {
+                    uploadCard.classList.remove('drag-over');
+                });
+            });
+            
+            uploadCard.addEventListener('drop', async function(e) {
+                var files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    var items = e.dataTransfer.items;
+                    var hasFolder = false;
+                    
+                    for (var i = 0; i < items.length; i++) {
+                        var entry = items[i].webkitGetAsEntry();
+                        if (entry && entry.isDirectory) {
+                            hasFolder = true;
+                            break;
+                        }
+                    }
+                    
+                    if (hasFolder) {
+                        var allFiles = [];
+                        for (var j = 0; j < items.length; j++) {
+                            var entry = items[j].webkitGetAsEntry();
+                            if (entry) {
+                                await traverseDirectory(entry, '', allFiles);
+                            }
+                        }
+                        
+                        var formData = new FormData();
+                        formData.append('type', 'folder');
+                        for (var k = 0; k < allFiles.length; k++) {
+                            formData.append('folder_files', allFiles[k]);
+                        }
+                        
+                        var response = await fetch('/api/' + userId + '/upload', { method: 'POST', body: formData });
+                        var data = await response.json();
+                        if (data.success) {
+                            showToast('✅ Folder uploaded!', 'success');
+                            loadFiles();
+                        }
+                    } else {
+                        var formData = new FormData();
+                        for (var m = 0; m < files.length; m++) {
+                            formData.append('files', files[m]);
+                        }
+                        
+                        var response = await fetch('/api/' + userId + '/upload', { method: 'POST', body: formData });
+                        var data = await response.json();
+                        if (data.success) {
+                            showToast('✅ Uploaded ' + data.count + ' files!', 'success');
+                            loadFiles();
+                        }
+                    }
+                }
+            });
+        }
+        
+        async function traverseDirectory(entry, path, files) {
+            if (entry.isFile) {
+                return new Promise(function(resolve) {
+                    entry.file(function(file) {
+                        Object.defineProperty(file, 'webkitRelativePath', { value: path + file.name });
+                        files.push(file);
+                        resolve();
+                    });
+                });
+            } else if (entry.isDirectory) {
+                var reader = entry.createReader();
+                return new Promise(function(resolve) {
+                    reader.readEntries(async function(entries) {
+                        for (var i = 0; i < entries.length; i++) {
+                            await traverseDirectory(entries[i], path + entry.name + '/', files);
+                        }
+                        resolve();
+                    });
+                });
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', async function() {
+            setupDragAndDrop();
+            loadFiles();
+            checkConnection();
+            
+            if (refreshInterval) clearInterval(refreshInterval);
+            refreshInterval = setInterval(function() {
+                loadFiles();
+                checkConnection();
+            }, 3000);
+        });
+        
+        var modalClose = document.querySelector('.modal-close');
+        if (modalClose) {
+            modalClose.addEventListener('click', function() {
+                var modal = document.getElementById('preview-modal');
+                if (modal) modal.style.display = 'none';
+            });
+        }
+        
+        var previewModal = document.getElementById('preview-modal');
+        if (previewModal) {
+            previewModal.addEventListener('click', function(e) {
+                if (e.target === e.currentTarget) {
+                    e.currentTarget.style.display = 'none';
+                }
+            });
+        }
+        
+        window.uploadFiles = uploadFiles;
+        window.uploadFolder = uploadFolder;
+        window.sendMessage = sendMessage;
+        window.previewFile = previewFile;
+        window.downloadFile = downloadFile;
+        window.deleteFile = deleteFile;
+        window.clearAll = clearAll;
+    </script>
+</body>
+</html>
