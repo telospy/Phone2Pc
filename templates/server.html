@@ -42,26 +42,17 @@
                     <h2>🚀 Server Configuration</h2>
                     
                     <div class="form-group">
-                        <label>🔑 Ngrok Token</label>
+                        <label>🔑 Ngrok Token (Saved in Browser - Permanent)</label>
                         <div class="input-with-button">
-                            <input type="password" id="ngrok-token" placeholder="Enter your ngrok token" value="{{ user_data.ngrok_token }}">
+                            <input type="password" id="ngrok-token" placeholder="Enter your ngrok token">
                             <button class="btn-secondary" onclick="window.open('https://dashboard.ngrok.com/signup')">Get Token</button>
                         </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>📁 Save Location</label>
-                        <div class="input-with-button">
-                            <input type="text" id="save-folder" placeholder="Select folder where files will be saved" value="{{ user_data.save_folder }}">
-                            <button class="btn-secondary" onclick="browseFolder()">Browse</button>
-                        </div>
-                        <div id="folder-required" class="folder-required" {% if user_data.save_folder %}style="display: none;"{% endif %}>
-                            ⚠️ <strong>Required:</strong> Select a folder before starting the server
-                        </div>
+                        <small style="color: #718096; font-size: 0.7rem; margin-top: 5px; display: block;">✓ Token is saved in your browser's localStorage. You only need to enter it once per browser.</small>
+                        <small style="color: #27ae60; font-size: 0.7rem; margin-top: 3px; display: block;" id="token-status"></small>
                     </div>
                     
                     <div class="server-actions">
-                        <button class="btn-start" id="start-btn" {% if not user_data.save_folder %}disabled{% endif %}>
+                        <button class="btn-start" id="start-btn">
                             <span>🚀</span> Start Server
                         </button>
                         <button class="btn-stop" id="stop-btn" disabled>
@@ -121,7 +112,7 @@
             </div>
 
             <div class="card files-card">
-                <h2>📥 Files</h2>
+                <h2>📥 Files <span id="file-count" style="font-size: 0.7rem; color: #718096;"></span></h2>
                 <div id="file-list" class="file-list">
                     <div class="empty-state">
                         <span>📭</span>
@@ -154,19 +145,21 @@
     <script>
         // Variables from server
         var userId = "{{ user_id }}";
-        var savedToken = "{{ user_data.ngrok_token }}";
         var savedFolder = "{{ user_data.save_folder }}";
         var clientUrl = "{{ request.host_url.rstrip('/') }}/client/{{ user_data.secret_key }}";
         
         var serverRunning = false;
         var refreshInterval = null;
         var statusInterval = null;
+        var lastFileCount = 0;
         
         var startBtn = document.getElementById('start-btn');
         var stopBtn = document.getElementById('stop-btn');
         var ngrokTokenInput = document.getElementById('ngrok-token');
-        var saveFolderInput = document.getElementById('save-folder');
-        var folderRequired = document.getElementById('folder-required');
+        var tokenStatusSpan = document.getElementById('token-status');
+        
+        // Storage key for localStorage
+        var STORAGE_KEY = 'phone2pc_ngrok_token';
         
         function showToast(message, type) {
             var toast = document.createElement('div');
@@ -194,48 +187,53 @@
             }
         }
         
-        function browseFolder() {
-            var input = document.createElement('input');
-            input.type = 'file';
-            input.webkitdirectory = true;
-            input.onchange = function(e) {
-                if (e.target.files.length > 0) {
-                    var path = e.target.files[0].webkitRelativePath;
-                    var folderPath = path.split('/')[0];
-                    if (saveFolderInput) {
-                        saveFolderInput.value = folderPath;
-                        validateStartButton();
-                        saveSettings();
-                    }
+        // Save token to localStorage
+        function saveTokenToLocalStorage(token) {
+            if (token) {
+                localStorage.setItem(STORAGE_KEY, token);
+                if (tokenStatusSpan) {
+                    tokenStatusSpan.innerHTML = '✓ Token saved to browser storage';
+                    setTimeout(() => {
+                        if (tokenStatusSpan) tokenStatusSpan.innerHTML = '';
+                    }, 2000);
                 }
-            };
-            input.click();
-        }
-        
-        function validateStartButton() {
-            if (!startBtn) return;
-            var folder = saveFolderInput ? saveFolderInput.value : '';
-            if (!folder) {
-                startBtn.disabled = true;
-                if (folderRequired) folderRequired.style.display = 'block';
-            } else {
-                startBtn.disabled = false;
-                if (folderRequired) folderRequired.style.display = 'none';
+                console.log('✅ Token saved to localStorage');
+                return true;
             }
+            return false;
         }
         
-        async function saveSettings() {
-            var token = ngrokTokenInput ? ngrokTokenInput.value : '';
-            var folder = saveFolderInput ? saveFolderInput.value : '';
-            if (!token && !folder) return;
+        // Load token from localStorage
+        function loadTokenFromLocalStorage() {
+            var savedToken = localStorage.getItem(STORAGE_KEY);
+            if (savedToken) {
+                ngrokTokenInput.value = savedToken;
+                if (tokenStatusSpan) {
+                    tokenStatusSpan.innerHTML = '✓ Token loaded from browser storage';
+                    setTimeout(() => {
+                        if (tokenStatusSpan) tokenStatusSpan.innerHTML = '';
+                    }, 2000);
+                }
+                console.log('✅ Token loaded from localStorage');
+                return true;
+            }
+            return false;
+        }
+        
+        // Also save to server for the current user session
+        async function saveTokenToServer(token) {
+            if (!token) return false;
             try {
-                await fetch('/api/' + userId + '/save_settings', {
+                var response = await fetch('/api/' + userId + '/save_settings', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ngrok_token: token, save_folder: folder })
+                    body: JSON.stringify({ ngrok_token: token })
                 });
+                var data = await response.json();
+                return data.success;
             } catch (error) {
-                console.error('Save settings error:', error);
+                console.error('Save to server error:', error);
+                return false;
             }
         }
         
@@ -256,7 +254,15 @@
                     updateStatus('online', data.url);
                     await showQRCode(clientUrl);
                     startStatusCheck();
-                    loadFiles();
+                } else {
+                    serverRunning = false;
+                    if (startBtn && !startBtn.disabled) {
+                        startBtn.innerHTML = '🚀 Start Server';
+                        startBtn.disabled = false;
+                        startBtn.style.background = '';
+                    }
+                    if (stopBtn) stopBtn.disabled = true;
+                    updateStatus('offline');
                 }
             } catch (error) {
                 console.error('Status check error:', error);
@@ -315,6 +321,18 @@
                         if (timerDiv) {
                             timerDiv.innerHTML = '⏰ Expires in: ' + mins.toString().padStart(2, '0') + ':' + secs.toString().padStart(2, '0');
                         }
+                    } else {
+                        // Server stopped running
+                        serverRunning = false;
+                        if (startBtn) {
+                            startBtn.disabled = false;
+                            startBtn.innerHTML = '🚀 Start Server';
+                            startBtn.style.background = '';
+                        }
+                        if (stopBtn) stopBtn.disabled = true;
+                        updateStatus('offline');
+                        var qrCard = document.getElementById('qr-card');
+                        if (qrCard) qrCard.style.display = 'none';
                     }
                 } catch (error) {
                     console.error('Status check error:', error);
@@ -324,18 +342,17 @@
         
         async function startServer() {
             var token = ngrokTokenInput ? ngrokTokenInput.value : '';
-            var folder = saveFolderInput ? saveFolderInput.value : '';
             
             if (!token) {
-                showToast('Please enter your ngrok token', 'error');
-                return;
-            }
-            if (!folder) {
-                showToast('Please select a save folder', 'error');
+                showToast('⚠️ Please enter your ngrok token first', 'error');
                 return;
             }
             
-            await saveSettings();
+            // Save token to localStorage (permanent across all user sessions)
+            saveTokenToLocalStorage(token);
+            
+            // Also save to server for current session
+            await saveTokenToServer(token);
             
             if (startBtn) {
                 startBtn.disabled = true;
@@ -346,7 +363,7 @@
                 var response = await fetch('/api/' + userId + '/start_server', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ngrok_token: token, save_folder: folder })
+                    body: JSON.stringify({ ngrok_token: token })
                 });
                 
                 var data = await response.json();
@@ -362,9 +379,10 @@
                     updateStatus('online', data.url);
                     await showQRCode(data.client_url);
                     startStatusCheck();
-                    loadFiles();
                     
                     showToast('✅ Server started successfully!', 'success');
+                    // Immediately load files after server starts
+                    await loadFiles();
                 } else {
                     showToast(data.error || 'Failed to start server', 'error');
                     if (startBtn) {
@@ -402,9 +420,6 @@
                     
                     updateStatus('offline');
                     
-                    if (refreshInterval) clearInterval(refreshInterval);
-                    if (statusInterval) clearInterval(statusInterval);
-                    
                     showToast('🛑 Server stopped', 'success');
                 }
             } catch (error) {
@@ -439,7 +454,7 @@
                 if (data.success) {
                     showToast('✅ Uploaded ' + data.count + ' files!', 'success');
                     document.getElementById('file-input').value = '';
-                    loadFiles();
+                    await loadFiles();
                 } else {
                     showToast('Upload failed', 'error');
                 }
@@ -475,7 +490,7 @@
                 if (data.success) {
                     showToast('✅ Folder uploaded!', 'success');
                     document.getElementById('folder-input').value = '';
-                    loadFiles();
+                    await loadFiles();
                 } else {
                     showToast('Upload failed', 'error');
                 }
@@ -506,7 +521,7 @@
                 if (data.success) {
                     showToast('✅ Message saved!', 'success');
                     document.getElementById('message-input').value = '';
-                    loadFiles();
+                    await loadFiles();
                 } else {
                     showToast('Failed to save message', 'error');
                 }
@@ -521,12 +536,32 @@
                 var data = await response.json();
                 
                 var fileList = document.getElementById('file-list');
+                var fileCountSpan = document.getElementById('file-count');
                 if (!fileList) return;
                 
                 if (!data.categories || data.categories.length === 0) {
                     fileList.innerHTML = '<div class="empty-state"><span>📭</span><p>No files yet</p></div>';
+                    if (fileCountSpan) fileCountSpan.innerHTML = '';
+                    lastFileCount = 0;
                     return;
                 }
+                
+                // Count total files
+                var totalFiles = 0;
+                for (var i = 0; i < data.categories.length; i++) {
+                    totalFiles += data.categories[i].files.length;
+                }
+                
+                if (fileCountSpan) {
+                    fileCountSpan.innerHTML = `(${totalFiles} files)`;
+                }
+                
+                // Check if new files arrived
+                if (totalFiles > lastFileCount && lastFileCount !== 0) {
+                    var newFiles = totalFiles - lastFileCount;
+                    showToast(`📥 ${newFiles} new file(s) received!`, 'success');
+                }
+                lastFileCount = totalFiles;
                 
                 var html = '';
                 for (var i = 0; i < data.categories.length; i++) {
@@ -585,7 +620,7 @@
                 var data = await response.json();
                 if (data.success) {
                     showToast('✅ File deleted', 'success');
-                    loadFiles();
+                    await loadFiles();
                 }
             } catch (error) {
                 showToast('Error: ' + error.message, 'error');
@@ -600,7 +635,7 @@
                 var data = await response.json();
                 if (data.success) {
                     showToast('✅ All files cleared', 'success');
-                    loadFiles();
+                    await loadFiles();
                 }
             } catch (error) {
                 showToast('Error: ' + error.message, 'error');
@@ -686,7 +721,7 @@
                         var data = await response.json();
                         if (data.success) {
                             showToast('✅ Folder uploaded!', 'success');
-                            loadFiles();
+                            await loadFiles();
                         }
                     } else {
                         var formData = new FormData();
@@ -698,7 +733,7 @@
                         var data = await response.json();
                         if (data.success) {
                             showToast('✅ Uploaded ' + data.count + ' files!', 'success');
-                            loadFiles();
+                            await loadFiles();
                         }
                     }
                 }
@@ -735,30 +770,43 @@
             stopBtn.onclick = stopServer;
         }
         if (ngrokTokenInput) {
+            // Save token to localStorage immediately when user types
             ngrokTokenInput.addEventListener('input', function() {
-                saveSettings();
-                validateStartButton();
+                if (ngrokTokenInput.value) {
+                    saveTokenToLocalStorage(ngrokTokenInput.value);
+                }
             });
-        }
-        if (saveFolderInput) {
-            saveFolderInput.addEventListener('input', function() {
-                saveSettings();
-                validateStartButton();
+            ngrokTokenInput.addEventListener('change', function() {
+                if (ngrokTokenInput.value) {
+                    saveTokenToLocalStorage(ngrokTokenInput.value);
+                }
+            });
+            ngrokTokenInput.addEventListener('blur', function() {
+                if (ngrokTokenInput.value) {
+                    saveTokenToLocalStorage(ngrokTokenInput.value);
+                }
             });
         }
         
         // Initialize
         document.addEventListener('DOMContentLoaded', async function() {
-            if (savedToken && ngrokTokenInput) ngrokTokenInput.value = savedToken;
-            if (savedFolder && saveFolderInput) saveFolderInput.value = savedFolder;
+            // Load token from localStorage first
+            loadTokenFromLocalStorage();
             
-            validateStartButton();
-            
+            // Check server status
             await checkServerStatus();
+            
+            // Setup drag and drop
             setupDragAndDrop();
-            loadFiles();
+            
+            // Initial load
+            await loadFiles();
+            
+            // Set up auto-refresh for files (every 2 seconds for instant updates)
             if (refreshInterval) clearInterval(refreshInterval);
-            refreshInterval = setInterval(loadFiles, 3000);
+            refreshInterval = setInterval(async function() {
+                await loadFiles();
+            }, 2000);
         });
         
         // Modal close
@@ -782,7 +830,6 @@
         // Expose functions to global scope
         window.copyUrl = copyUrl;
         window.copyShareUrl = copyShareUrl;
-        window.browseFolder = browseFolder;
         window.uploadFiles = uploadFiles;
         window.uploadFolder = uploadFolder;
         window.sendMessage = sendMessage;
