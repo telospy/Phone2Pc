@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Phone to PC File Transfer - Professional File Sharing Platform
 Author: Tsegaye (131)
@@ -101,7 +100,7 @@ def create_user():
             'server_running': False,
             'public_url': None,
             'start_time': None,
-            'ngrok_token': '',
+            'ngrok_token': '',  # Start empty
             'save_folder': str(user_folder)
         }
         
@@ -134,6 +133,7 @@ def server_view(user_id):
     if not user_data:
         return render_template('not_found.html', user_id=user_id), 404
     
+    # Make sure we pass the saved token to the template
     return render_template('server.html', user_id=user_id, user_data=user_data)
 
 @app.route('/client/<secret_key>')
@@ -166,21 +166,30 @@ def save_user_settings(user_id):
         
         data = request.get_json()
         
-        if 'ngrok_token' in data:
+        if 'ngrok_token' in data and data['ngrok_token']:
             user_data['ngrok_token'] = data['ngrok_token']
+            save_user(user_id, user_data)
+            print(f"✅ Token saved permanently for user {user_id}")  # Debug log
+            return jsonify({'success': True, 'message': 'Token saved permanently'})
         
-        if 'save_folder' in data:
-            save_folder = data['save_folder']
-            user_data['save_folder'] = save_folder
-            Path(save_folder).mkdir(parents=True, exist_ok=True)
-            
-            categories = ['Images', 'Videos', 'Audio', 'Archives', 'Documents', 'Messages', 'Folder_Uploads', 'Others']
-            for cat in categories:
-                (Path(save_folder) / cat).mkdir(exist_ok=True)
-        
-        save_user(user_id, user_data)
         return jsonify({'success': True})
         
+    except Exception as e:
+        print(f"Error saving settings: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/<user_id>/get_token', methods=['GET'])
+def get_user_token(user_id):
+    """API endpoint to get the saved token"""
+    try:
+        user_data = load_user(user_id)
+        if not user_data:
+            return jsonify({'error': 'User not found'}), 404
+        
+        return jsonify({
+            'success': True,
+            'ngrok_token': user_data.get('ngrok_token', '')
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -195,16 +204,23 @@ def start_user_server(user_id):
         
         data = request.get_json()
         ngrok_token = data.get('ngrok_token', '').strip()
-        save_folder = data.get('save_folder', user_data.get('save_folder'))
         
+        # If token not provided in request, try to use saved token
         if not ngrok_token:
-            return jsonify({'error': 'Ngrok token required'}), 400
+            ngrok_token = user_data.get('ngrok_token', '')
+            if not ngrok_token:
+                return jsonify({'error': 'Ngrok token required. Please enter your token first.'}), 400
         
-        user_data['ngrok_token'] = ngrok_token
-        user_data['save_folder'] = save_folder
+        # Save the token permanently (update if changed)
+        if ngrok_token != user_data.get('ngrok_token'):
+            user_data['ngrok_token'] = ngrok_token
+            save_user(user_id, user_data)
+            print(f"✅ Token updated and saved for user {user_id}")
+        
         user_data['server_running'] = True
         user_data['start_time'] = datetime.now().isoformat()
         
+        save_folder = user_data.get('save_folder')
         Path(save_folder).mkdir(parents=True, exist_ok=True)
         
         categories = ['Images', 'Videos', 'Audio', 'Archives', 'Documents', 'Messages', 'Folder_Uploads', 'Others']
@@ -281,6 +297,7 @@ def start_user_server(user_id):
         })
         
     except Exception as e:
+        print(f"Error starting server: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/<user_id>/stop_server', methods=['POST'])
